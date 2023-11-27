@@ -26,11 +26,6 @@ configuration:
   type: 9
   section: Connect
   required: false
-- additionalinfo: "(For Cortex XSOAR 6.x) False (For Cortex XSOAR 8 and Cortex XSIAM) Optional for engines, otherwise mandatory."
-  display: Password
-  name: password
-  type: 4
-  required: false
 - display: Certificate (Required for HTTPS)
   additionalinfo: "(For Cortex XSOAR 6.x) For use with HTTPS - the certificate that the service should use. (For Cortex XSOAR 8 and Cortex XSIAM) Custom certificates are not supported."
   name: certificate
@@ -49,26 +44,18 @@ configuration:
   type: 8
   section: Connect
   required: false
-description: '[Enter a comprehensive, yet concise, description of what the integration does, what use cases it is designed for, etc.].'
-display: AWSSNSListener
-name: AWSSNSListener
+description: 'AWS-SNS-Listener description'
+display: AWS-SNS-Listener
+name: AWS-SNS-Listener
 script:
-  commands:
-  - arguments:
-    - description: '[Enter a description of the argument, including any important information users need to know, for example, default values.].'
-      name: dummy
-      required: true
-    description: '[Enter a description of the command, including any important information users need to know, for example required permissions.].'
-    name: baseintegration-dummy
-    outputs:
-    - contextPath: BaseIntegration.Output
-      description: '[Enter a description of the data returned in this output.].'
-      type: String
-  runonce: false
+  commands: []
+  dockerimage: devdemisto/boto3py3:1.0.0.81124
+  longRunning: true
+  longRunningPort: true
   script: '-'
-  type: python
   subtype: python3
-  dockerimage: demisto/boto3py3:1.0.0.80307
+  type: python
+  isFetchSamples: true
 fromversion: 6.10.0
 tests:
 - No tests (auto formatted)
