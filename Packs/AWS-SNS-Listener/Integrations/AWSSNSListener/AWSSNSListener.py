@@ -1,15 +1,16 @@
 import demistomock as demisto  # noqa: F401
 from CommonServerPython import *  # noqa: F401
-from tempfile import NamedTemporaryFile
+# from tempfile import NamedTemporaryFile
 from traceback import format_exc
 from collections import deque
 import uvicorn
-from secrets import compare_digest
+# from secrets import compare_digest
 from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.security.api_key import APIKey, APIKeyHeader
 from pydantic import BaseModel
 from CommonServerUserPython import *
+import boto3
 
 sample_events_to_store = deque(maxlen=20)  # type: ignore[var-annotated]
 
@@ -18,25 +19,25 @@ basic_auth = HTTPBasic(auto_error=False)
 token_auth = APIKeyHeader(auto_error=False, name='Authorization')
 
 
-class Incident(BaseModel):
-    name: Optional[str] = None
-    type: Optional[str] = None
-    occurred: Optional[str] = None
-    raw_json: Optional[Dict] = None
+# class Incident(BaseModel):
+#     name: Optional[str] = None
+#     type: Optional[str] = None
+#     occurred: Optional[str] = None
+#     raw_json: Optional[Dict] = None
 
 
-@app.post('/sns')
-async def handle_post(
-        incident: Incident,
-        request: Request,
-        credentials: HTTPBasicCredentials = Depends(basic_auth),
-        token: APIKey = Depends(token_auth)
-):
-    demisto.error("Got AWS SNS request")
-    header_name = None
-    request_headers = dict(request.headers)
-
-    credentials_param = demisto.params().get('credentials')
+# @app.post('/sns')
+# async def handle_post(
+#         incident: Incident,
+#         request: Request,
+#         credentials: HTTPBasicCredentials = Depends(basic_auth),
+#         token: APIKey = Depends(token_auth)
+# ):
+#     print("Got AWS SNS request")
+#     demisto.error("DFRIED Got AWS SNS request")
+#     header_name = None
+#     request_headers = dict(request.headers)
+#     credentials_param = demisto.params().get('credentials')
 
     # return demisto.createIncidents([incident])
 
@@ -63,7 +64,10 @@ async def handle_post(
 #         demisto.error("Failed handling AWS SNS request")
 #         write_error(w, ErrAWSSNSSubscriptionRequest, "Invalid request type", r)
 
-
+def handle_message(message):
+    demisto.error(f'DFRIED {message}')
+    print(message)
+    demisto.error(f'DFRIED {message}')
 
 ''' MAIN FUNCTION '''
 
@@ -81,56 +85,86 @@ def main():
     # validate_params(aws_default_region, aws_role_arn, aws_role_session_name, aws_access_key_id,
     #                     aws_secret_access_key)
     try:
-        try:
-            port = int(demisto.params().get('longRunningPort'))
-        except ValueError as e:
-            raise ValueError(f'Invalid listen port - {e}')
+        # try:
+        #     port = int(demisto.params().get('longRunningPort'))
+        # except ValueError as e:
+        #     raise ValueError(f'Invalid listen port - {e}')
         if demisto.command() == 'test-module':
-            return "ok"
+            return_results("ok")
         # elif demisto.command() == 'fetch-incidents':
         #     fetch_samples()
         elif demisto.command() == 'long-running-execution':
             while True:
-                certificate = demisto.params().get('certificate', '')
-                private_key = demisto.params().get('key', '')
+                print("before sns")
+                demisto.error("DFRIED before sns")
+                sns = boto3.client('sns', region_name='eu-central-1')
+                print("sns is on")
+                demisto.error("DFRIED sns is on")
+                response = sns.subscribe(
+                    TopicArn='arn:aws:sns:eu-central-1:794065701450:demisto',
+                    Protocol='https',
+                    Endpoint='http://0.0.0.0',
+                )
+                print("sns subscribed")
+                demisto.error("DFRIED sns subscribed")
+                response = sns.receive_message(
+                    TopicArn='arn:aws:sns:eu-central-1:794065701450:demisto',
+                    WaitTimeSeconds=20
+                )
 
-                certificate_path = ''
-                private_key_path = ''
-                try:
-                    ssl_args = dict()
+                if 'Messages' in response:
+                    print("in messages")
+                    demisto.error("DFRIED in messages")
+                    for message in response['Messages']:
+                        handle_message(message)
+                        sns.delete_message(
+                            QueueUrl=response['QueueUrl'],
+                            ReceiptHandle=message['ReceiptHandle']
+                        )
+                else:
+                    print('No messages')
+                    demisto.error('DFRIED No messages')
+            # while True:
+            #     certificate = demisto.params().get('certificate', '')
+            #     private_key = demisto.params().get('key', '')
 
-                    # if certificate and private_key:
-                    #     certificate_file = NamedTemporaryFile(delete=False)
-                    #     certificate_path = certificate_file.name
-                    #     certificate_file.write(bytes(certificate, 'utf-8'))
-                    #     certificate_file.close()
-                    #     ssl_args['ssl_certfile'] = certificate_path
+            #     certificate_path = ''
+            #     private_key_path = ''
+            #     try:
+            #         ssl_args = dict()
 
-                    #     private_key_file = NamedTemporaryFile(delete=False)
-                    #     private_key_path = private_key_file.name
-                    #     private_key_file.write(bytes(private_key, 'utf-8'))
-                    #     private_key_file.close()
-                    #     ssl_args['ssl_keyfile'] = private_key_path
+            #         # if certificate and private_key:
+            #         #     certificate_file = NamedTemporaryFile(delete=False)
+            #         #     certificate_path = certificate_file.name
+            #         #     certificate_file.write(bytes(certificate, 'utf-8'))
+            #         #     certificate_file.close()
+            #         #     ssl_args['ssl_certfile'] = certificate_path
 
-                    #     demisto.debug('Starting HTTPS Server')
-                    # else:
-                    #     demisto.debug('Starting HTTP Server')
+            #         #     private_key_file = NamedTemporaryFile(delete=False)
+            #         #     private_key_path = private_key_file.name
+            #         #     private_key_file.write(bytes(private_key, 'utf-8'))
+            #         #     private_key_file.close()
+            #         #     ssl_args['ssl_keyfile'] = private_key_path
 
-                    integration_logger = IntegrationLogger()
-                    integration_logger.buffering = False
-                    log_config = dict(uvicorn.config.LOGGING_CONFIG)
-                    log_config['handlers']['default']['stream'] = integration_logger
-                    log_config['handlers']['access']['stream'] = integration_logger
-                    uvicorn.run(app, host='0.0.0.0', port=port, log_config=log_config, **ssl_args)
-                except Exception as e:
-                    demisto.error(f'An error occurred in the long running loop: {str(e)} - {format_exc()}')
-                    demisto.updateModuleHealth(f'An error occurred: {str(e)}')
-                finally:
-                    if certificate_path:
-                        os.unlink(certificate_path)
-                    if private_key_path:
-                        os.unlink(private_key_path)
-                    time.sleep(5)
+            #         #     demisto.debug('Starting HTTPS Server')
+            #         # else:
+            #         #     demisto.debug('Starting HTTP Server')
+
+            #         integration_logger = IntegrationLogger()
+            #         integration_logger.buffering = False
+            #         log_config = dict(uvicorn.config.LOGGING_CONFIG)
+            #         log_config['handlers']['default']['stream'] = integration_logger
+            #         log_config['handlers']['access']['stream'] = integration_logger
+            #         uvicorn.run(app, host='0.0.0.0', port=port, log_config=log_config, **ssl_args)
+            #     except Exception as e:
+            #         demisto.error(f'An error occurred in the long running loop: {str(e)} - {format_exc()}')
+            #         demisto.updateModuleHealth(f'An error occurred: {str(e)}')
+            #     finally:
+            #         if certificate_path:
+            #             os.unlink(certificate_path)
+            #         if private_key_path:
+            #             os.unlink(private_key_path)
+            #         time.sleep(5)
     except Exception as e:
         demisto.error(format_exc())
         return_error(f'Failed to execute {demisto.command()} command. Error: {e}')
